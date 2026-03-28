@@ -34,19 +34,11 @@ jobs:
                       GIT_ABR_VERSION=${{ github.sha }}
 
             - name: Create config file
+              env:
+                  MBTA_V3_API_KEY: ${{ secrets.MBTA_V3_API_KEY }}
               run: |
-                  cat >> ./local.json << EOF
-                  {
-                      "mbta": {
-                          "v3_api_key": "${{ secrets.MBTA_V3_API_KEY }}"
-                      },
-                      "modes": ["cr", "bus"],
-                          "gtfs": {
-                          "refresh_interval_days": 7
-                      },
-                      "DATADOG_TRACE_ENABLED": true
-                  }
-                  EOF
+                  jq '.mbta.v3_api_key = env.MBTA_V3_API_KEY | .DATADOG_TRACE_ENABLED = false' \
+                    config/template.json > ./local.json
 
             - name: Test container starts successfully
               run: |
