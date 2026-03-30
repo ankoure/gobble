@@ -30,27 +30,35 @@ NIBBLE_WAIT_INTERVAL = 3
 
 
 def wait_for_nibble():
+    """
+    Block until nibble's HTTP server is accepting requests, or raise RuntimeError after
+    NIBBLE_WAIT_TIMEOUT seconds. Only runs when SSE_BASE_URL targets localhost/127.0.0.1.
+    Must be called before any connection to the SSE endpoint is attempted.
+    """
     parsed = urlparse(SSE_BASE_URL)
     if parsed.hostname not in ("localhost", "127.0.0.1"):
         return
     health_url = f"{parsed.scheme}://{parsed.netloc}/health"
-    logger.info(f"Waiting for nibble at {health_url} (timeout={NIBBLE_WAIT_TIMEOUT}s)...")
+    # Use a module-local logger so this function doesn't depend on the module-level
+    # `logger` global, which is assigned later in the __main__ block.
+    _log = logging.getLogger(__name__)
+    _log.info(f"Waiting for nibble at {health_url} (timeout={NIBBLE_WAIT_TIMEOUT}s)...")
     deadline = time.time() + NIBBLE_WAIT_TIMEOUT
     while time.time() < deadline:
         try:
             resp = requests.get(health_url, timeout=5)
             if resp.ok:
-                logger.info("nibble is ready.")
+                _log.info("nibble is ready.")
                 return
         except requests.exceptions.ConnectionError:
+            pass
+        except requests.exceptions.RequestException:
             pass
         time.sleep(NIBBLE_WAIT_INTERVAL)
     raise RuntimeError(f"nibble did not become ready within {NIBBLE_WAIT_TIMEOUT}s at {health_url}")
 
 
 def main():
-    wait_for_nibble()
-
     # Start downloading GTFS bundles immediately
     gtfs.start_watching_gtfs()
 
@@ -148,6 +156,7 @@ def process_events(client: sseclient.SSEClient, trips_state: TripsStateManager):
 
 
 if __name__ == "__main__":
+    wait_for_nibble()
     logger = set_up_logging(__file__)
     main()
 else:
