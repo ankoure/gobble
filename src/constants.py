@@ -68,6 +68,7 @@ AGENCY_MODULES = {
     "everett_transit": "agencies.everett_transit_routes",
     "kitsap_transit": "agencies.kitsap_transit_routes",
     "smart": "agencies.smart_routes",
+    "ace": "agencies.ace_routes"
 }
 
 if AGENCY not in AGENCY_MODULES:
