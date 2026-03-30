@@ -4,6 +4,7 @@ import threading
 import time
 import traceback
 from typing import Set
+from urllib.parse import urlparse
 
 import requests
 import sseclient
@@ -24,8 +25,32 @@ SSE_BASE_URL = SSE_CONFIG.get("base_url", "https://api-v3.mbta.com/vehicles")
 API_KEY = SSE_CONFIG.get("api_key") or CONFIG["mbta"]["v3_api_key"]
 HEADERS = {"X-API-KEY": API_KEY, "Accept": "text/event-stream"}
 
+NIBBLE_WAIT_TIMEOUT = 120
+NIBBLE_WAIT_INTERVAL = 3
+
+
+def wait_for_nibble():
+    parsed = urlparse(SSE_BASE_URL)
+    if parsed.hostname not in ("localhost", "127.0.0.1"):
+        return
+    health_url = f"{parsed.scheme}://{parsed.netloc}/health"
+    logger.info(f"Waiting for nibble at {health_url} (timeout={NIBBLE_WAIT_TIMEOUT}s)...")
+    deadline = time.time() + NIBBLE_WAIT_TIMEOUT
+    while time.time() < deadline:
+        try:
+            resp = requests.get(health_url, timeout=5)
+            if resp.ok:
+                logger.info("nibble is ready.")
+                return
+        except requests.exceptions.ConnectionError:
+            pass
+        time.sleep(NIBBLE_WAIT_INTERVAL)
+    raise RuntimeError(f"nibble did not become ready within {NIBBLE_WAIT_TIMEOUT}s at {health_url}")
+
 
 def main():
+    wait_for_nibble()
+
     # Start downloading GTFS bundles immediately
     gtfs.start_watching_gtfs()
 
