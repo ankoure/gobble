@@ -52,6 +52,22 @@ AGENCY_MODULES = {
     "wrta": "agencies.wrta_routes",
     "gptd": "agencies.gptd_routes",
     "gcrta": "agencies.gcrta_routes",
+    "bat": "agencies.bat_routes",
+    "cata": "agencies.cata_routes",
+    "capmetro": "agencies.capmetro_routes",
+    "uta": "agencies.uta_routes",
+    "metra": "agencies.metra_routes",
+    "marc": "agencies.marc_routes",
+    "vre": "agencies.vre_routes",
+    "trimet": "agencies.trimet_routes",
+    "pierce_transit": "agencies.pierce_transit_routes",
+    "community_transit": "agencies.community_transit_routes",
+    "intercity_transit": "agencies.intercity_transit_routes",
+    "wsf": "agencies.wsf_routes",
+    "seattle_monorail": "agencies.seattle_monorail_routes",
+    "everett_transit": "agencies.everett_transit_routes",
+    "kitsap_transit": "agencies.kitsap_transit_routes",
+    "smart": "agencies.smart_routes",
 }
 
 if AGENCY not in AGENCY_MODULES:

@@ -1,6 +1,7 @@
 import shutil
 from pathlib import Path
 
+
 def pytest_configure(config):
     """Create config/local.json from template if it doesn't exist, so tests can import modules."""
     root = Path(__file__).parent
