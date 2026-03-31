@@ -25,7 +25,7 @@ SSE_BASE_URL = SSE_CONFIG.get("base_url", "https://api-v3.mbta.com/vehicles")
 API_KEY = SSE_CONFIG.get("api_key") or CONFIG["mbta"]["v3_api_key"]
 HEADERS = {"X-API-KEY": API_KEY, "Accept": "text/event-stream"}
 
-NIBBLE_WAIT_TIMEOUT = 120
+NIBBLE_WAIT_TIMEOUT = 300
 NIBBLE_WAIT_INTERVAL = 3
 
 
