@@ -1,83 +1,33 @@
 """
-Route constants - dynamically loaded based on configured agency.
+Route constants - loaded from config/routes.json at startup.
 
 This module loads route constants (BUS_STOPS, ROUTES_BUS, ROUTES_CR, ROUTES_RAPID, ALL_ROUTES)
-from agency-specific files based on the 'agency' setting in config/local.json.
+from config/routes.json, which should be mounted as a Kubernetes ConfigMap.
 Each set of constants correlates a GTFS Static, and GTFS-RT pair.
 For example SEPTA maintains seperate GTFS bundles for Regional Rail and Bus/Trolley.
 
-Supported agencies:
-- mbta: Massachusetts Bay Transportation Authority
-- septa_regionalrail: Southeastern Pennsylvania Transportation Authority Regional Rail
-- ccrta, frta, gatra, lrta, mart, pvta, vta, wrta: Massachusetts RTAs
+Generate routes.json with:
+    python scripts/generate_agency_routes.py <gtfs_zip_or_url> <agency> --format json
 """
 
-import importlib
+import json
+from pathlib import Path
+
 from config import CONFIG
 
-# Determine which agency configuration to load
 AGENCY = CONFIG.get("agency", "mbta").lower()
 
+_ROUTES_FILE = Path("config/routes.json")
 
-AGENCY_MODULES = {
-    "mbta": "agencies.mbta_routes",
-    "septa_regionalrail": "agencies.septa_rr_routes",
-    "septa_bus": "agencies.septa_bus_routes",
-    "ctdot": "agencies.ctdot_routes",
-    "caltrain": "agencies.caltrain_routes",
-    "denver_rtd": "agencies.denver_rtd_routes",
-    "kingcountymetro": "agencies.kingcountymetro_routes",
-    "wegostar": "agencies.wegostar_routes",
-    "wmata_bus": "agencies.wmata_bus_routes",
-    "wmata_rail": "agencies.wmata_rail_routes",
-    "marta": "agencies.marta_routes",
-    "lirr": "agencies.lirr_routes",
-    "nyc_subway": "agencies.nyc_subway_routes",
-    "stm_montreal_bus": "agencies.stm_montreal_routes",
-    "pvta": "agencies.pvta_routes",
-    "ripta": "agencies.ripta_routes",
-    "metro_transit": "agencies.metro_transit_routes",
-    "meva": "agencies.meva_routes",
-    "cats": "agencies.cats_routes",
-    "ttc": "agencies.ttc_routes",
-    "soundtransit": "agencies.soundtransit_routes",
-    "mwrta": "agencies.mwrta_routes",
-    "brta": "agencies.brta_routes",
-    "ccrta": "agencies.ccrta_routes",
-    "frta": "agencies.frta_routes",
-    "gatra": "agencies.gatra_routes",
-    "lrta": "agencies.lrta_routes",
-    "mart": "agencies.mart_routes",
-    "vta": "agencies.vta_routes",
-    "wrta": "agencies.wrta_routes",
-    "gptd": "agencies.gptd_routes",
-    "gcrta": "agencies.gcrta_routes",
-    "bat": "agencies.bat_routes",
-    "cata": "agencies.cata_routes",
-    "capmetro": "agencies.capmetro_routes",
-    "uta": "agencies.uta_routes",
-    "metra": "agencies.metra_routes",
-    "marc": "agencies.marc_routes",
-    "vre": "agencies.vre_routes",
-    "trimet": "agencies.trimet_routes",
-    "pierce_transit": "agencies.pierce_transit_routes",
-    "community_transit": "agencies.community_transit_routes",
-    "intercity_transit": "agencies.intercity_transit_routes",
-    "wsf": "agencies.wsf_routes",
-    "seattle_monorail": "agencies.seattle_monorail_routes",
-    "everett_transit": "agencies.everett_transit_routes",
-    "kitsap_transit": "agencies.kitsap_transit_routes",
-    "smart": "agencies.smart_routes",
-    "ace": "agencies.ace_routes",
-}
+if not _ROUTES_FILE.exists():
+    raise FileNotFoundError(
+        f"config/routes.json not found. "
+        f"Generate it with: python scripts/generate_agency_routes.py <gtfs_zip> {AGENCY} --format json"
+    )
 
-if AGENCY not in AGENCY_MODULES:
-    raise ValueError(f"Unknown agency '{AGENCY}'. Supported agencies: {list(AGENCY_MODULES)}.")
-
-mod = importlib.import_module(AGENCY_MODULES[AGENCY])
-
-BUS_STOPS = mod.BUS_STOPS
-ROUTES_BUS = mod.ROUTES_BUS
-ROUTES_CR = mod.ROUTES_CR
-ROUTES_RAPID = mod.ROUTES_RAPID
-ALL_ROUTES = mod.ALL_ROUTES
+_data = json.loads(_ROUTES_FILE.read_text())
+BUS_STOPS = {k: set(v) for k, v in _data["bus_stops"].items()}
+ROUTES_CR = set(_data.get("routes_cr", []))
+ROUTES_RAPID = set(_data.get("routes_rapid", []))
+ROUTES_BUS = set(BUS_STOPS.keys())
+ALL_ROUTES = ROUTES_BUS | ROUTES_CR | ROUTES_RAPID

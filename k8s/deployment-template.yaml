@@ -1,0 +1,79 @@
+# Gobble agency deployment template.
+#
+# Copy this file and replace <AGENCY> with the agency name (e.g. mbta, septa_bus).
+#
+# Prerequisites — create both ConfigMaps before applying:
+#
+#   # 1. Generate routes.json from GTFS (no image rebuild needed)
+#   python scripts/generate_agency_routes.py <gtfs_url_or_zip> <AGENCY> --format json
+#
+#   # 2. Create/update ConfigMaps
+#   kubectl create configmap gobble-<AGENCY>-config \
+#     --from-file=local.json=config/local/<AGENCY>.json \
+#     --dry-run=client -o yaml | kubectl apply -f -
+#
+#   kubectl create configmap gobble-<AGENCY>-routes \
+#     --from-file=routes.json=src/agencies/<AGENCY>_routes.json \
+#     --dry-run=client -o yaml | kubectl apply -f -
+#
+#   # 3. Apply this manifest
+#   kubectl apply -f k8s/<AGENCY>-deployment.yaml
+#
+# The same container image is reused across all agencies — no rebuild required.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gobble-<AGENCY>
+  labels:
+    app: gobble
+    agency: <AGENCY>
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gobble
+      agency: <AGENCY>
+  template:
+    metadata:
+      labels:
+        app: gobble
+        agency: <AGENCY>
+    spec:
+      containers:
+        - name: gobble
+          image: <YOUR_REGISTRY>/gobble:latest
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: PYTHONPATH
+              value: /app/src
+          volumeMounts:
+            - name: config
+              mountPath: /app/config/local.json
+              subPath: local.json
+              readOnly: true
+            - name: routes
+              mountPath: /app/config/routes.json
+              subPath: routes.json
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          restartPolicy: Always
+      volumes:
+        - name: config
+          configMap:
+            name: gobble-<AGENCY>-config
+            items:
+              - key: local.json
+                path: local.json
+        - name: routes
+          configMap:
+            name: gobble-<AGENCY>-routes
+            items:
+              - key: routes.json
+                path: routes.json

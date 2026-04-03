@@ -1,35 +1,34 @@
 #!/usr/bin/env python3
 """
-Generate agency route files from GTFS Static data.
+Generate agency route data from GTFS Static data.
 
 This script extracts routes and their associated stops from GTFS Static bundles
-and generates Python files that can be imported by the constants module.
+and generates a routes.json file to be mounted as a Kubernetes ConfigMap.
 
-The generated files contain:
-- BUS_STOPS: Dict mapping route IDs to sets of stop IDs
-- ROUTES_BUS: Set of bus route IDs
-- ROUTES_CR: Set of commuter rail route IDs
-- ROUTES_RAPID: Set of rapid transit route IDs
-- ALL_ROUTES: Union of all route sets
+The generated file contains:
+- bus_stops: Dict mapping route IDs to lists of stop IDs
+- routes_cr: List of commuter rail route IDs
+- routes_rapid: List of rapid transit route IDs
 
 Usage:
     python generate_agency_routes.py <gtfs_zip_path> <output_agency_name> [options]
 
 Examples:
-    # Generate for MBTA from a GTFS zip file
-    python generate_agency_routes.py data/mbta.zip mbta
+    # Generate routes.json for MBTA (outputs to config/mbta_routes.json)
+    python generate_agency_routes.py data/mbta.zip mbta --format json
 
-    # Generate with custom route type mapping
-    python generate_agency_routes.py data/caltrain.zip caltrain \\
-        --route-types-bus 3 --route-types-cr 2 --route-types-rapid ""
+    # Generate from a URL with custom route type mapping
+    python generate_agency_routes.py https://example.com/gtfs.zip caltrain \\
+        --format json --route-types-bus 3 --route-types-cr 2 --route-types-rapid ""
 
-    # Generate and specify output location
+    # Generate to a custom output location
     python generate_agency_routes.py data/gtfs.zip agency_name \\
-        --output-dir ./custom_output_dir
+        --format json --output-dir ./custom_output_dir
 """
 
 import argparse
 import csv
+import json
 import sys
 import tempfile
 import urllib.request
@@ -228,6 +227,28 @@ ALL_ROUTES = ROUTES_BUS.union(ROUTES_CR).union(ROUTES_RAPID)
     return code
 
 
+def generate_agency_json(
+    route_stops: Dict[str, Set[str]],
+    routes_bus: Set[str],
+    routes_cr: Set[str],
+    routes_rapid: Set[str],
+) -> str:
+    """Generate a JSON representation of agency route data.
+
+    Produces a routes.json suitable for mounting as a Kubernetes ConfigMap.
+    Load in constants.py when config/routes.json is present.
+    """
+    bus_stops_filtered = {k: sorted(v) for k, v in route_stops.items() if k in routes_bus}
+    return json.dumps(
+        {
+            "bus_stops": bus_stops_filtered,
+            "routes_cr": sorted(routes_cr),
+            "routes_rapid": sorted(routes_rapid),
+        },
+        indent=2,
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Generate agency route files from GTFS Static data",
@@ -246,8 +267,8 @@ def main():
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("src/agencies"),
-        help="Output directory for generated file (default: src/agencies)",
+        default=Path("config"),
+        help="Output directory for generated file (default: config)",
     )
 
     parser.add_argument(
@@ -269,6 +290,13 @@ def main():
         type=lambda x: set(x.split(",")) if x else set(),
         default={"0", "1"},
         help="Comma-separated list of GTFS route_type values for rapid transit (default: 0,1)",
+    )
+
+    parser.add_argument(
+        "--format",
+        choices=["python", "json"],
+        default="python",
+        help="Output format: 'python' generates a .py module (default), 'json' generates a routes.json for Kubernetes ConfigMap mounting",
     )
 
     args = parser.parse_args()
@@ -319,16 +347,21 @@ def main():
         print(f"  Commuter rail routes: {len(routes_cr)}")
         print(f"  Rapid transit routes: {len(routes_rapid)}")
 
-        print("Generating Python file...")
-        file_content = generate_agency_file(
-            args.agency_name,
-            route_stops,
-            routes_bus,
-            routes_cr,
-            routes_rapid,
-        )
+        if args.format == "json":
+            print("Generating JSON file...")
+            file_content = generate_agency_json(route_stops, routes_bus, routes_cr, routes_rapid)
+            output_file = args.output_dir / f"{args.agency_name}_routes.json"
+        else:
+            print("Generating Python file...")
+            file_content = generate_agency_file(
+                args.agency_name,
+                route_stops,
+                routes_bus,
+                routes_cr,
+                routes_rapid,
+            )
+            output_file = args.output_dir / f"{args.agency_name}_routes.py"
 
-        output_file = args.output_dir / f"{args.agency_name}_routes.py"
         output_file.write_text(file_content)
         print(f"\nSuccess! Generated: {output_file}")
 
